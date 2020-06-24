@@ -11,6 +11,8 @@ class ChannelIRC(asyncore.dispatcher):
   buffer_read = ''
   buffer_write = ''
   login_n = 0
+  pong_t = False
+  pong_server = ''
 
   def __init__(self, host, port, nick):
     self.nick = nick
@@ -33,8 +35,6 @@ class ChannelIRC(asyncore.dispatcher):
     while True:
       recv_line = self.pull_buffer_read()
       if (recv_line != ''):
-        print(self.message_filter(recv_line))
-        #print(recv_line)
         self.processor(False, recv_line)
       else:
         break
@@ -174,6 +174,23 @@ class ChannelIRC(asyncore.dispatcher):
     #print(res)
     return res
 
+  def gen_message(self, comm, params):
+    sub_sep = ':'
+    sub_space = ' '
+    res = ''
+    params_raw = ''
+    params_len = len(params)
+    params_n = 0
+    while (params_n < params_len):
+      if (params_n == params_len - 1):
+        params_raw += sub_space + sub_sep + params[params_n]
+      else:
+        params_raw += sub_space + params[params_n]
+      params_n += 1
+    if (comm == 'PONG'):
+      res = comm + params_raw
+    return res
+
   def processor(self, mode, data = ''):
     res = False
     if (mode):
@@ -191,8 +208,16 @@ class ChannelIRC(asyncore.dispatcher):
         res = True
       elif (self.login_n == 3):
         print('ok')
+        if (self.pong_t):
+          self.push_buffer_write(self.gen_message('PONG', [self.pong_server]))
+          self.pong_t = False
+          res = True
     else:
-      pass
-      self.message_parser(data)
+      mess_data = self.message_parser(self.message_filter(data))
+      print(mess_data)
+      if (mess_data['status']):
+        if (mess_data['command'] == 'PING'):
+          self.pong_t = True
+          self.pong_server = mess_data['params'][0]
     return res
 
